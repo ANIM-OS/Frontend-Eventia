@@ -4,6 +4,7 @@ import QRCode from 'qrcode'
 import jsQR from 'jsqr'
 import { accessStatus, canEditEvent, canPublishEvent, canShowTicketQr, enrichTickets } from '../src/eventLogic.js'
 import { ensureSuccess, jsonBody } from '../src/http.js'
+import { aplicarCupos } from '../src/aforo.js'
 
 const event = { eventoId: 12, estado: 'PUBLICADO', estadoModeracion: 'CONFORME', fechaInicio: '2026-10-30T01:00:00Z', fechaFin: '2026-10-30T05:00:00Z' }
 
@@ -67,4 +68,15 @@ test('el QR mostrado en la entrada se puede decodificar con el mismo lector de f
     }
   }
   assert.equal(jsQR(pixels, size, size)?.data, token)
+})
+
+test('el aviso de cupos en vivo actualiza solo el evento indicado y bloquea la compra si se agota', () => {
+  const lista = [{ eventoId: 1, aforoTotal: 4, entradasVendidas: 3, cuposDisponibles: 1, agotado: false, disponibleParaCompra: true }, { eventoId: 2, cuposDisponibles: 10 }]
+  const aviso = { eventoId: 1, aforoTotal: 4, entradasVendidas: 4, cuposDisponibles: 0, agotado: true }
+  const cambiados = lista.filter(event => aplicarCupos(event, aviso))
+  assert.equal(cambiados.length, 1)
+  assert.equal(lista[0].cuposDisponibles, 0)
+  assert.equal(lista[0].disponibleParaCompra, false)
+  assert.equal(lista[1].cuposDisponibles, 10)
+  assert.equal(aplicarCupos(null, aviso), false)
 })

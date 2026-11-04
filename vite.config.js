@@ -12,6 +12,13 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           secure: false,
         },
+        // US-09: SignalR (cupos en tiempo real) usa WebSockets
+        '/hubs': {
+          target: env.VITE_API_PROXY_TARGET || 'https://localhost:7224',
+          changeOrigin: true,
+          secure: false,
+          ws: true,
+        },
       },
     },
   }

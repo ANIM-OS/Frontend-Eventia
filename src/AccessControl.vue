@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, onUnmounted, reactive, ref, watch } from 'vue'
 import { api } from './api'
 import { accessStatus, isPublished } from './eventLogic'
 
@@ -42,14 +42,23 @@ async function readPhoto(change) {
   } catch (failure) { if (!disposed) error.value = failure.message }
   finally { cleanup(); scanning.value = false; change.target.value = '' }
 }
+// US-08: ingreso manual (si la cámara falla) con el ID de la entrada y el DNI del titular
+const manual = reactive({ entradaId: '', documento: '' })
+const manualReady = computed(() => Number(manual.entradaId) > 0 && manual.documento.trim().length >= 8)
+const canValidate = computed(() => Boolean(code.value.trim()) || manualReady.value)
+watch(manual, () => { result.value = null; error.value = '' })
 async function validate() {
-  if (locked.value || !code.value.trim() || !status.value.allowed || result.value) return
+  if (locked.value || !canValidate.value || !status.value.allowed || result.value) return
   submitting.value = true; error.value = ''
-  try { result.value = await api.validarEntrada({ eventoId: event.value.eventoId, codigoQr: code.value.trim() }) }
+  // El QR trae un token firmado que vence en segundos: se valida apenas se lee
+  const body = code.value.trim()
+    ? { eventoId: event.value.eventoId, codigoQr: code.value.trim() }
+    : { eventoId: event.value.eventoId, entradaId: Number(manual.entradaId), titularDocumento: manual.documento.trim() }
+  try { result.value = await api.validarEntrada(body) }
   catch (failure) { error.value = failure.message }
   finally { submitting.value = false }
 }
-function nextAttendee() { code.value = ''; result.value = null; error.value = '' }
+function nextAttendee() { code.value = ''; manual.entradaId = ''; manual.documento = ''; result.value = null; error.value = '' }
 </script>
 
 <template>
@@ -66,9 +75,9 @@ function nextAttendee() { code.value = ''; result.value = null; error.value = ''
         <input ref="cameraInput" hidden type="file" accept="image/*" capture="environment" @change="readPhoto">
         <input ref="photoInput" hidden type="file" accept="image/*" @change="readPhoto">
         <div class="scan-actions"><button type="button" class="primary-button" :disabled="locked" @click="cameraInput.click()">{{ scanning ? 'Leyendo QR…' : 'Tomar foto del QR' }}</button><button type="button" class="secondary-button" :disabled="locked" @click="photoInput.click()">Elegir imagen</button></div>
-        <p v-if="code && !result" class="scan-ready" role="status">QR leído. Confirma el ingreso del asistente.</p>
-        <details v-if="!result" class="manual-code"><summary>Ingresar código manualmente</summary><input v-model="code" :disabled="locked" aria-label="Código de la entrada" placeholder="Código de la entrada" autocomplete="off"></details>
-        <button v-if="!result" class="primary-button access-confirm" :disabled="locked || !code.trim()">{{ submitting ? 'Validando…' : 'Validar y registrar ingreso' }}</button>
+        <p v-if="code && !result" class="scan-ready" role="status">QR leído. Confirma el ingreso ahora: el código del asistente vence en pocos segundos.</p>
+        <details v-if="!result && !code" class="manual-code"><summary>Ingresar datos manualmente</summary><div class="manual-fields"><input v-model="manual.entradaId" :disabled="locked" inputmode="numeric" aria-label="ID de la entrada" placeholder="ID de la entrada (ej. 12)" autocomplete="off"><input v-model="manual.documento" :disabled="locked" inputmode="numeric" maxlength="20" aria-label="Documento del titular" placeholder="DNI del titular" autocomplete="off"></div><small>El ID aparece en la entrada del asistente. Se verifica que el DNI coincida con el titular.</small></details>
+        <button v-if="!result" class="primary-button access-confirm" :disabled="locked || !canValidate">{{ submitting ? 'Validando…' : 'Validar y registrar ingreso' }}</button>
       </form>
       <div v-if="result" class="access-result" :class="result.valida ? 'accepted' : 'rejected'" role="status"><strong>{{ result.valida ? 'Ingreso confirmado' : 'Acceso rechazado' }}</strong><p>{{ result.mensaje }}</p><span v-if="result.titularNombre">{{ result.titularNombre }} · {{ result.tipoAcceso }}</span><button type="button" class="secondary-button" @click="nextAttendee">Siguiente asistente</button></div>
     </template>

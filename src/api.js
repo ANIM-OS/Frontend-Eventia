@@ -58,6 +58,7 @@ export const api = {
   intereses: () => get('/Usuario/me/intereses'), actualizarIntereses: (categoriaIds) => put('/Usuario/me/intereses', { categoriaIds }),
   comprar: (data) => post('/Compra', data), compras: () => get('/Compra/mis-compras'), compra: (id) => get(`/Compra/${id}`),
   entradas: () => get('/Entrada/mis-entradas'), validarEntrada: (data) => post('/Entrada/validar', data),
+  qrEntrada: (id) => get(`/Entrada/${id}/qr`), reglasEvento: () => get('/Evento/reglas'),
   ventas: (filters = {}) => get(`/Venta/panel?${query(filters)}`), exportarVentas: (format, filters = {}) => download(`/Venta/exportar/${format}?${query(filters)}`),
   resenasEvento: (id) => get(`/Resena/evento/${id}`), misResenas: () => get('/Resena/mias'), pendientesResena: () => get('/Resena/pendientes'), crearResena: (data) => post('/Resena', data),
   notificaciones: () => get('/Notificacion'), leerNotificacion: (id) => put(`/Notificacion/${id}/leer`), leerTodas: () => put('/Notificacion/leer-todas'),
